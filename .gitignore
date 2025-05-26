@@ -1,0 +1,49 @@
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Environment variables and secrets
+.env
+.env.local
+*.env
+
+# Database files
+*.db
+*.sqlite3
+data/databases/
+
+# API Keys and Config files with secrets
+config/api_keys.py
+config/secrets.py
+
+# Logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# MacOS files
+.DS_Store
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# Data files (we'll add specific ones later)
+data/raw/
+data/processed/
+*.csv
+*.xlsx
+
+# Temporary files
+*.tmp
+*.temp
