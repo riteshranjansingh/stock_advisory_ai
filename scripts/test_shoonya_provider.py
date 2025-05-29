@@ -9,6 +9,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+import pandas as pd # Import pandas here for type hinting and usage
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -91,8 +92,8 @@ def test_single_quote(provider):
             print(f"   Symbol: {quote.get('symbol')}")
             print(f"   LTP: ₹{quote.get('ltp', 'N/A')}")
             print(f"   Open: ₹{quote.get('open', 'N/A')}")
-            print(f"   High: ₹{quote.get('high', 'N/A')}")
-            print(f"   Low: ₹{quote.get('low', 'N/A')}")
+            print(f"   High: ₹{quote.get('h', 'N/A')}") # Corrected key if 'h' is used in quote response
+            print(f"   Low: ₹{quote.get('l', 'N/A')}")  # Corrected key if 'l' is used in quote response
             print(f"   Change: {quote.get('change', 'N/A'):.2f} ({quote.get('change_pct', 'N/A'):.2f}%)")
             print(f"   Volume: {quote.get('volume', 'N/A'):,}")
             return True
@@ -147,14 +148,21 @@ def test_historical_data(provider):
         if df is not None and not df.empty:
             print("✅ SUCCESS: Historical data retrieved")
             print(f"   Data points: {len(df)}")
-            print(f"   Date range: {df.index.min()} to {df.index.max()}")
+            
+            # Ensure 'date' column is datetime type before getting min/max and formatting
+            # This line ensures that if for any reason 'date' isn't datetime, it's converted.
+            df['date'] = pd.to_datetime(df['date']) 
+            
+            # Change 1: Access 'date' column for min/max and use strftime
+            print(f"   Date range: {df['date'].min().strftime('%Y-%m-%d')} to {df['date'].max().strftime('%Y-%m-%d')}")
             print(f"   Columns: {list(df.columns)}")
             
             # Show last few rows
             print("\n   📊 Recent data:")
             latest_data = df.tail(3)
-            for date, row in latest_data.iterrows():
-                print(f"      {date.strftime('%Y-%m-%d')}: O={row['open']:.2f} H={row['high']:.2f} L={row['low']:.2f} C={row['close']:.2f}")
+            # Change 2: Iterate using 'index, row' and access 'date' from 'row'
+            for index, row in latest_data.iterrows():
+                print(f"      {row['date'].strftime('%Y-%m-%d')}: O={row['open']:.2f} H={row['high']:.2f} L={row['low']:.2f} C={row['close']:.2f}")
             
             return True
         else:
@@ -164,6 +172,7 @@ def test_historical_data(provider):
     except Exception as e:
         print(f"❌ FAILED: Historical data error - {e}")
         return False
+
 
 def main():
     """Main test function"""
