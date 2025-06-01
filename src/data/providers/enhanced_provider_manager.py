@@ -467,53 +467,190 @@ class EnhancedDataProviderManager:
             self.logger.info(f"🚀 Starting with {self.current_provider}")
     
     # Public API methods with intelligent fallback
-    def get_stock_info(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get stock info with provider fallback"""
-        def _operation(provider: BaseDataProvider, symbol: str):
-            return provider.get_stock_info(symbol)
+    def get_stock_info(self, symbol: str, exchange: str = 'NSE') -> Optional[Dict[str, Any]]:
+        """Get stock info with automatic symbol normalization - FIXED VERSION"""
+        def _operation(provider: BaseDataProvider, symbol: str, exchange: str):
+            # Use the provider's method directly - let IT handle symbol conversion
+            result = provider.get_stock_info(symbol)
+            
+            # Ensure clean symbol in result
+            if result:
+                result['symbol'] = symbol  # Always return clean symbol
+                result['exchange'] = exchange
+                # Keep provider_symbol for debugging if available
+                if 'provider_symbol' not in result:
+                    result['provider_symbol'] = provider.normalize_symbol(symbol, exchange) if hasattr(provider, 'normalize_symbol') else symbol
+            
+            return result
         
         try:
-            return self._try_with_intelligent_fallback("get_stock_info", _operation, symbol)
+            # Ensure providers are initialized
+            if not self._ensure_providers_initialized():
+                self.logger.error("Failed to initialize providers")
+                return None
+            
+            return self._try_with_intelligent_fallback("get_stock_info", _operation, symbol, exchange)
         except Exception as e:
             self.logger.error(f"Failed to get stock info for {symbol}: {e}")
             return None
-    
+
     def get_historical_data(self, symbol: str, start_date: date, end_date: date, 
-                          interval: str = "1D") -> Optional[pd.DataFrame]:
-        """Get historical data with provider fallback"""
+                        interval: str = "1D", exchange: str = 'NSE') -> Optional[pd.DataFrame]:
+        """Get historical data with automatic symbol normalization - FIXED VERSION"""
         def _operation(provider: BaseDataProvider, symbol: str, start_date: date, 
-                      end_date: date, interval: str):
-            return provider.get_historical_data(symbol, start_date, end_date, interval)
+                    end_date: date, interval: str, exchange: str):
+            
+            # CRITICAL FIX: Use provider's method directly, don't bypass it!
+            data = provider.get_historical_data(symbol, start_date, end_date, interval)
+            
+            # Ensure clean symbol in result DataFrame
+            if data is not None and not data.empty:
+                data = data.copy()
+                # Add clean symbol column if not present
+                if 'symbol' not in data.columns:
+                    data['symbol'] = symbol
+                else:
+                    # Ensure all symbols are clean
+                    data['symbol'] = symbol
+                
+                # Add debugging info
+                data['exchange'] = exchange
+                if hasattr(provider, 'normalize_symbol'):
+                    provider_symbol = provider.normalize_symbol(symbol, exchange)
+                    data['provider_symbol'] = provider_symbol
+            
+            return data
         
         try:
+            # Ensure providers are initialized
+            if not self._ensure_providers_initialized():
+                self.logger.error("Failed to initialize providers")
+                return None
+            
             return self._try_with_intelligent_fallback("get_historical_data", _operation, 
-                                                     symbol, start_date, end_date, interval)
+                                                    symbol, start_date, end_date, interval, exchange)
         except Exception as e:
             self.logger.error(f"Failed to get historical data for {symbol}: {e}")
             return None
     
-    def get_real_time_data(self, symbols: List[str]) -> Optional[Dict[str, Dict[str, Any]]]:
-        """Get real-time data with provider fallback"""
-        def _operation(provider: BaseDataProvider, symbols: List[str]):
-            return provider.get_real_time_data(symbols)
+    def get_real_time_data(self, symbols: List[str], exchange: str = 'NSE') -> Optional[Dict[str, Dict[str, Any]]]:
+        """Get real-time data with automatic symbol normalization - FIXED VERSION"""
+        def _operation(provider: BaseDataProvider, symbols: List[str], exchange: str):
+            
+            # CRITICAL FIX: Use provider's method directly with clean symbols
+            provider_data = provider.get_real_time_data(symbols)
+            
+            if not provider_data:
+                return None
+            
+            # Ensure all results have clean symbols
+            normalized_data = {}
+            for symbol in symbols:
+                # Look for this symbol in provider data (provider handles symbol conversion internally)
+                symbol_data = None
+                
+                # Provider might return data with clean symbols or provider-specific symbols
+                for key, data in provider_data.items():
+                    # Check if this data is for our symbol
+                    if (key == symbol or 
+                        (hasattr(provider, 'denormalize_symbol') and 
+                        provider.denormalize_symbol(key).upper() == symbol.upper())):
+                        symbol_data = data.copy()
+                        break
+                
+                if symbol_data:
+                    # Ensure clean symbol in result
+                    symbol_data['symbol'] = symbol
+                    symbol_data['exchange'] = exchange
+                    normalized_data[symbol] = symbol_data
+            
+            return normalized_data
         
         try:
-            return self._try_with_intelligent_fallback("get_real_time_data", _operation, symbols)
+            # Ensure providers are initialized
+            if not self._ensure_providers_initialized():
+                self.logger.error("Failed to initialize providers")
+                return None
+            
+            return self._try_with_intelligent_fallback("get_real_time_data", _operation, symbols, exchange)
         except Exception as e:
             self.logger.error(f"Failed to get real-time data: {e}")
             return None
-    
+
+
     def search_stocks(self, query: str) -> List[Dict[str, Any]]:
-        """Search stocks with provider fallback"""
+        """Search stocks with symbol normalization - FIXED VERSION"""
         def _operation(provider: BaseDataProvider, query: str):
-            return provider.search_stocks(query)
+            # Use provider's search method directly
+            results = provider.search_stocks(query)
+            
+            # Ensure all results have clean symbols
+            if results:
+                for result in results:
+                    if 'symbol' in result:
+                        # If provider returned provider-specific symbol, clean it
+                        if hasattr(provider, 'denormalize_symbol'):
+                            clean_symbol = provider.denormalize_symbol(result['symbol'])
+                            original_symbol = result['symbol']
+                            result['symbol'] = clean_symbol
+                            result['provider_symbol'] = original_symbol
+                        # Ensure symbol is clean
+                        result['symbol'] = result['symbol'].upper()
+            
+            return results
         
         try:
+            # Ensure providers are initialized
+            if not self._ensure_providers_initialized():
+                return []
+            
             result = self._try_with_intelligent_fallback("search_stocks", _operation, query)
             return result if result else []
         except Exception as e:
             self.logger.error(f"Failed to search stocks for '{query}': {e}")
             return []
+    
+    def get_symbol_info(self, symbol: str, exchange: str = 'NSE') -> Dict[str, str]:
+        """Get symbol mapping information for debugging - NEW METHOD"""
+        try:
+            if not self._ensure_providers_initialized():
+                return {}
+            
+            current_provider = self.get_active_provider()
+            if not current_provider:
+                return {}
+            
+            info = {
+                'clean_symbol': symbol,
+                'provider_name': current_provider.name,
+                'exchange': exchange
+            }
+            
+            # Test normalization if available
+            if hasattr(current_provider, 'normalize_symbol'):
+                try:
+                    provider_symbol = current_provider.normalize_symbol(symbol, exchange)
+                    info['provider_symbol'] = provider_symbol
+                    
+                    if hasattr(current_provider, 'denormalize_symbol'):
+                        clean_back = current_provider.denormalize_symbol(provider_symbol)
+                        info['normalized_back'] = clean_back
+                        info['consistent'] = symbol.upper() == clean_back.upper()
+                    else:
+                        info['consistent'] = True
+                except Exception as e:
+                    info['normalization_error'] = str(e)
+                    info['consistent'] = False
+            else:
+                info['normalization_available'] = False
+                info['consistent'] = True
+            
+            return info
+            
+        except Exception as e:
+            self.logger.error(f"Error getting symbol info: {e}")
+            return {'error': str(e)}
+
     
     def get_enhanced_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all providers"""

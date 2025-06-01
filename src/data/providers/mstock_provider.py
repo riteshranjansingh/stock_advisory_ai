@@ -484,6 +484,64 @@ class MStockProvider(BaseDataProvider):
             'rate_limits': self.endpoint_limits,
             'status': 'WORKING - Ready for AI Trading System!'
         }
+    # ============================================================================
+    # MSTOCK PROVIDER SYMBOL IMPLEMENTATION
+    # ============================================================================
+
+    def _provider_normalize_symbol(self, symbol: str, exchange: str = 'NSE') -> str:
+        """
+        Convert clean symbol to MStock format (instrument token)
+        
+        Examples:
+            "RELIANCE" → "2885" (instrument token)
+            "TCS" → "11536" (instrument token)
+        """
+        symbol = symbol.upper()
+        
+        # Check if we have the token in our instruments cache
+        if hasattr(self, '_instruments_cache') and symbol in self._instruments_cache:
+            instrument = self._instruments_cache[symbol]
+            return instrument.get('instrument_token', symbol)
+        
+        # If token cache not available, we might need to search
+        # This is where MStock's script master lookup would happen
+        if hasattr(self, '_get_instrument_token'):
+            token = self._get_instrument_token(symbol)
+            if token:
+                return token
+        
+        # Fallback: return symbol as-is (will be handled by MStock API)
+        return symbol
+    
+    def _provider_denormalize_symbol(self, provider_symbol: str) -> str:
+        """
+        Convert MStock token back to clean symbol
+        
+        Examples:
+            "2885" → "RELIANCE"
+            "11536" → "TCS"
+        """
+        try:
+            # Check reverse lookup in instruments cache
+            if hasattr(self, '_instruments_cache'):
+                for symbol, instrument in self._instruments_cache.items():
+                    if instrument.get('instrument_token') == provider_symbol:
+                        return symbol
+            
+            # If it's already a symbol (not a token), return as-is
+            if provider_symbol.isdigit():
+                # It's a token, but we don't have reverse mapping
+                self.logger.warning(f"No reverse mapping for MStock token {provider_symbol}")
+                return provider_symbol
+            else:
+                # It's already a symbol
+                return provider_symbol.upper()
+                
+        except Exception as e:
+            self.logger.warning(f"Error denormalizing MStock symbol {provider_symbol}: {e}")
+            return provider_symbol
+
+            
 
 # Test the fixed provider
 if __name__ == "__main__":

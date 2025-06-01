@@ -599,3 +599,41 @@ class ShoonyaProvider(BaseDataProvider):
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
+    # ============================================================================
+    # SHOONYA PROVIDER SYMBOL IMPLEMENTATION  
+    # ============================================================================
+
+    def _provider_normalize_symbol(self, symbol: str, exchange: str = 'NSE') -> str:
+        """
+        Convert clean symbol to Shoonya format
+        
+        Shoonya typically uses clean symbols, but may need trading symbol format
+        
+        Examples:
+            "RELIANCE" → "RELIANCE" (no change for basic symbols)
+            "RELIANCE" → "RELIANCE-EQ" (if trading symbol needed)
+        """
+        symbol = symbol.upper()
+        
+        # For Shoonya, we might need to check if it's equity
+        # Most equity symbols work as-is, but some APIs need -EQ suffix
+        return symbol  # Simple case - adjust based on your Shoonya API needs
+    
+    def _provider_denormalize_symbol(self, provider_symbol: str) -> str:
+        """
+        Convert Shoonya symbol back to clean format
+        
+        Examples:
+            "RELIANCE" → "RELIANCE" (no change)
+            "RELIANCE-EQ" → "RELIANCE" (remove suffix if present)
+        """
+        try:
+            # Remove -EQ suffix if present
+            if provider_symbol.endswith('-EQ'):
+                return provider_symbol[:-3].upper()
+            
+            return provider_symbol.upper()
+            
+        except Exception as e:
+            self.logger.warning(f"Error denormalizing Shoonya symbol {provider_symbol}: {e}")
+            return provider_symbol

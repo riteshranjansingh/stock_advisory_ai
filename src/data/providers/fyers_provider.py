@@ -447,3 +447,56 @@ class FyersProvider(BaseDataProvider):
         except Exception as e:
             self.logger.error(f"Connection test failed: {e}")
             return False
+    
+    # ============================================================================
+    # FYERS PROVIDER SYMBOL IMPLEMENTATION
+    # ============================================================================
+    def _provider_normalize_symbol(self, symbol: str, exchange: str = 'NSE') -> str:
+        """
+        Convert clean symbol to Fyers format
+        
+        Examples:
+            "RELIANCE" → "NSE:RELIANCE-EQ"
+            "TCS" → "NSE:TCS-EQ"
+            "NIFTY50" → "NSE:NIFTY50-INDEX" (for indices)
+        """
+        symbol = symbol.upper()
+        exchange = exchange.upper()
+        
+        # Handle special cases
+        if symbol in ['NIFTY', 'NIFTY50']:
+            return f"{exchange}:NIFTY50-INDEX"
+        elif symbol == 'BANKNIFTY':
+            return f"{exchange}:BANKNIFTY-INDEX"
+        
+        # Standard equity format
+        return f"{exchange}:{symbol}-EQ"
+    
+    def _provider_denormalize_symbol(self, provider_symbol: str) -> str:
+        """
+        Convert Fyers symbol back to clean format
+        
+        Examples:
+            "NSE:RELIANCE-EQ" → "RELIANCE"
+            "NSE:TCS-EQ" → "TCS"
+            "NSE:NIFTY50-INDEX" → "NIFTY50"
+        """
+        try:
+            # Remove exchange prefix
+            if ':' in provider_symbol:
+                parts = provider_symbol.split(':')
+                symbol_part = parts[1] if len(parts) > 1 else provider_symbol
+            else:
+                symbol_part = provider_symbol
+            
+            # Remove suffix
+            if '-' in symbol_part:
+                clean_symbol = symbol_part.split('-')[0]
+            else:
+                clean_symbol = symbol_part
+            
+            return clean_symbol.upper()
+            
+        except Exception as e:
+            self.logger.warning(f"Error denormalizing Fyers symbol {provider_symbol}: {e}")
+            return provider_symbol

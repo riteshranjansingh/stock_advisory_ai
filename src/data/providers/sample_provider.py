@@ -298,3 +298,18 @@ class SampleDataProvider(BaseDataProvider):
     def get_available_symbols(self) -> List[str]:
         """Get all available symbols in sample database"""
         return list(self.stock_database.keys())
+
+    # ============================================================================
+    # SAMPLE PROVIDER SYMBOL IMPLEMENTATION
+    # ============================================================================
+    def _provider_normalize_symbol(self, symbol: str, exchange: str = 'NSE') -> str:
+        """
+        Sample provider uses clean symbols
+        """
+        return symbol.upper()
+    
+    def _provider_denormalize_symbol(self, provider_symbol: str) -> str:
+        """
+        Sample provider uses clean symbols
+        """
+        return provider_symbol.upper()
