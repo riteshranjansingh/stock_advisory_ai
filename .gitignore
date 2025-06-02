@@ -47,3 +47,5 @@ data/processed/
 # Temporary files
 *.tmp
 *.temp
+
+scripts_backup
